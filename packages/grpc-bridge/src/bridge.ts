@@ -17,7 +17,7 @@ const STATUS_ABRUPT = new Status();
 STATUS_ABRUPT.setCode(2);
 STATUS_ABRUPT.setMessage('Call aborted.');
 
-export class BridgeStream implements StreamWriter<Uint8Array> {
+class BridgeStream implements StreamWriter<Uint8Array> {
   private status: Status;
   private trailer: Metadata;
   private open: boolean;
