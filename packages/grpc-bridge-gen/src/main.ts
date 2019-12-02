@@ -135,9 +135,8 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
     dts: `// Generated from ${basePath}\n\n`,
   };
 
-  code.js += `const { ClientBase, StatusError, mapStreamEvents, mapStream } = require('${PACKAGE_NAME}');\n`;
-  code.dts += 'import { TypedEventTarget } from \'@wellplayed/typed-event-target\';\n';
-  code.dts += `import { Service, ServiceMethod, StreamEvents, ClientBase, ExtraCallOptions, UnaryResponse } from '${PACKAGE_NAME}';\n`
+  code.js += `const { ClientBase, StatusError, mapStreamWriter, mapStreamObserver } = require('${PACKAGE_NAME}');\n`;
+  code.dts += `import { Service, ServiceMethod, StreamWriter, StreamObserver, ClientBase, ExtraCallOptions, UnaryResponse } from '${PACKAGE_NAME}';\n`
 
   code.js += '\n';
   code.dts += '\n';
@@ -154,7 +153,7 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
 
     // Generate service metadata.
 
-    dtsBody += `export const ${svcName} : Service;\n`;
+    dtsBody += `export const ${svcName} : Service;\n\n`;
     jsBody += `exports.${svcName} = {\n`;
     jsBody += `  name: ${js(svcName)},\n`;
 
@@ -207,39 +206,35 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
       const outputStreaming = mth.getServerStreaming() || false;
 
       if (inputStreaming) {
-        dtsBody += `  ${mthJsName}(options?: ExtraCallOptions): Stream<${inputType}, ${outputType}>;\n`;
+        dtsBody += `  ${mthJsName}(observer: StreamObserver<${outputType}>, options?: ExtraCallOptions): Promise<StreamWriter<${inputType}>>;\n`;
 
-        jsBody += `  async ${mthJsName}(options) {\n`;
+        jsBody += `  ${mthJsName}(observer, options) {\n`;
         jsBody += `    const methodDesc = ${mthRef};\n`;
-        jsBody += `    const s = await this.channel.createStream({ ...options, method: methodDesc.path });\n`;
-        jsBody += `    return mapStream(s, x => x.serializeBinary(), methodDesc.outputType.deserializeBinary());\n`;
+        jsBody += `    const rawObserver = mapStreamObserver(observer, x => methodDesc.outputType.deserializeBinary(x));\n`;
+        jsBody += `    return this.channel.createStream(rawObserver, { ...options, method: methodDesc.path })\n`;
+        jsBody += `      .then(writer => mapStreamWriter(writer, x => x.serializeBinary()));\n`;
         jsBody += `  }\n\n`;
       } else if (outputStreaming) {
         // Only response streaming.
-        dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): TypedEventTarget<StreamEvents<${outputType}>>;\n`;
+        dtsBody += `  ${mthJsName}(input: ${inputType}, observer: StreamObserver<${outputType}>, options?: ExtraCallOptions): void;\n`;
 
-        jsBody += `  async ${mthJsName}(input, options) {\n`;
+        jsBody += `  ${mthJsName}(input, observer, options) {\n`;
         jsBody += `    const methodDesc = ${mthRef};\n`;
-        jsBody += `    const s = await this.channel.createStream({ ...options, method: methodDesc.path });\n`;
-        jsBody += `    s.send(input.serializeBinary());\n`;
-        jsBody += `    return mapStreamEvents(s, methodDesc.outputType.deserializeBinary());\n`;
+        jsBody += `    const rawObserver = mapStreamObserver(observer, x => methodDesc.outputType.deserializeBinary(x));\n`;
+        jsBody += `    this.channel.createStream(rawObserver, { ...options, method: methodDesc.path })\n`;
+        jsBody += `      .then(writer => writer.send(input.serializeBinary()))\n`;
+        jsBody += `      .catch(err => streamObserverThrow(rawObserver, err));\n`;
         jsBody += `  }\n\n`;
       } else {
         // Unary call.
         dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): Promise<UnaryResponse<${outputType}>>;\n`;
 
-        jsBody += `  async ${mthJsName}(input, options) {\n`;
+        jsBody += `  ${mthJsName}(input, options) {\n`;
         jsBody += `    const methodDesc = ${mthRef};\n`;
-        jsBody += `    const s = await this.channel.createStream({ ...options, method: methodDesc.path });\n`;
         jsBody += `    return new Promise((accept, reject) => {\n`;
-        jsBody += `      let header = new Map();\n`;
-        jsBody += `      s.addEventListener('header', evt => header = evt.details.header);\n`;
-        jsBody += `      s.addEventListener('message', evt => accept({\n`;
-        jsBody += `        header,\n`;
-        jsBody += `        response: methodDesc.outputType.deserializeBinary(evt.detail.message),\n`;
-        jsBody += `      }));\n`;
-        jsBody += `      s.addEventListener('end', evt => reject(StatusError.fromEvent(evt)));\n`;
-        jsBody += `      s.send(input.serializeBinary());\n`;
+        jsBody += `      const observer = mapStreamObserver(new AsyncStreamObserver(accept, reject), x => methodDesc.outputType.deserializeBinary(x));\n`;
+        jsBody += `      this.channel.createStream(observer, { ...options, method: methodDesc.path })\n`;
+        jsBody += `        .then(writer => writer.send(input.serializeBinary()), reject);\n`;
         jsBody += `    });\n`;
         jsBody += `  }\n\n`;
       }

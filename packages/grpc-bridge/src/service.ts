@@ -1,7 +1,6 @@
 import { Message } from 'google-protobuf';
 import { ServiceOptions, MethodOptions } from 'google-protobuf/google/protobuf/descriptor_pb';
 import { Any } from 'google-protobuf/google/protobuf/any_pb';
-import { TypedEventTarget, CustomEvent } from '@wellplayed/typed-event-target';
 import { Status } from '../proto/bridge_pb';
 
 export type Metadata = Map<string, string[]>;
@@ -9,67 +8,80 @@ export type StatusEvent = CustomEvent<{ status: Status, trailer: Metadata }>;
 export type HeaderEvent = CustomEvent<{ header: Metadata }>;
 export type MessageEvent<TMsg> = CustomEvent<{ message: TMsg }>;
 
-export interface StreamEvents<TMsg = Uint8Array> {
-  header: HeaderEvent;
-  message: MessageEvent<TMsg>;
-  end: StatusEvent;
+export interface StreamObserver<TMsg> {
+  onHeader(header: Metadata): void;
+  onMessage(msg: TMsg): void;
+  onEnd(status: Status, trailer: Metadata): void;
 }
 
-export interface Stream<TSend = Uint8Array, TRecv = Uint8Array> extends TypedEventTarget<StreamEvents<TRecv>> {
-  send(msg: TSend): void;
+export interface StreamWriter<TMsg> {
+  send(msg: TMsg): void;
   close(): void;
 }
 
-interface MappedStream<TMsgOut> extends TypedEventTarget<TMsgOut> {
-  destroy(): void;
+export interface UnaryResponse<T> {
+  header: Metadata;
+  trailer: Metadata;
+  message: T;
 }
 
-class MapStreamEvents<TOuter, TInner> extends TypedEventTarget<StreamEvents<TOuter>> implements MappedStream<TOuter> {
-  constructor(inner: TypedEventTarget<StreamEvents<TInner>>, mapper: (msg: TInner) => TOuter) {
-    super();
+export function mapStreamObserver<TInner, TOuter>(observer: StreamObserver<TOuter>, mapper: (x: TInner) => TOuter): StreamObserver<TInner> {
+  return {
+    onHeader(header: Metadata): void {
+      return observer.onHeader(header);
+    },
+    onMessage(msg: TInner): void {
+      return observer.onMessage(mapper(msg));
+    },
+    onEnd(status: Status, trailer: Metadata): void {
+      return observer.onEnd(status, trailer);
+    },
+  };
+}
 
-    const onHeader = (evt: HeaderEvent) => this.dispatchEvent(evt);
-    const onMessage = (evt: MessageEvent<TInner>) => this.dispatchEvent(new CustomEvent('message', {
-      detail: {
-        message: mapper(evt.detail.message),
-      },
-    }));
-    const onEnd = (evt: StatusEvent) => this.dispatchEvent(evt);
+export function mapStreamWriter<TInner, TOuter>(writer: StreamWriter<TInner>, mapper: (x: TOuter) => TInner): StreamWriter<TOuter> {
+  return {
+    send(msg: TOuter): void {
+      return writer.send(mapper(msg));
+    },
+    close(): void {
+      return writer.close();
+    },
+  };
+}
+
+export class AsyncStreamObserver<TMsg> implements StreamObserver<TMsg> {
+  public header: Metadata;
+  public message: TMsg | null;
+  public trailer: Metadata;
+  public status: Status;
+
+  constructor(private accept: (target: UnaryResponse<TMsg>) => void, private reject: (err: StatusError) => void) {
+    this.header = new Map();
+    this.message = null;
+    this.trailer = new Map();
+    this.status = new Status();
+  }
+
+  onHeader(header: Metadata): void {
+    this.header = header;
+  }
   
-    inner.addEventListener('header', onHeader);
-    inner.addEventListener('message', onMessage);
-    inner.addEventListener('end', onEnd);
-
-    this.destroy = () => {
-      inner.removeEventListener('header', onHeader);
-      inner.removeEventListener('message', onMessage);
-      inner.removeEventListener('end', onEnd);
-    };
+  onMessage(msg: TMsg): void {
+    this.message = msg;
   }
 
-  destroy() {}
-}
-
-class MapStream<TOuterIn, TOuterOut, TInnerIn, TInnerOut> extends MapStreamEvents<TOuterOut, TInnerOut> implements Stream<TOuterIn, TOuterOut> {
-  constructor(private innerStream: Stream<TInnerIn, TInnerOut>, private inputMapper: (msg: TOuterIn) => TInnerIn, outputMapper: (msg: TInnerOut) => TOuterOut) {
-    super(innerStream, outputMapper);
+  onEnd(status: Status, trailer: Metadata): void {
+    if (status.getCode() != 0) {
+      this.reject(StatusError.fromStatus(status, trailer));
+    } else {
+      this.accept({
+        header: this.header,
+        trailer,
+        message: this.message!,
+      });
+    }
   }
-
-  send(msg: TOuterIn): void {
-    return this.innerStream.send(this.inputMapper(msg));
-  }
-
-  close(): void {
-    return this.innerStream.close();
-  }
-}
-
-export function mapStreamEvents<TMsgIn, TMsgOut>(events: TypedEventTarget<StreamEvents<TMsgIn>>, mapper: (msg: TMsgIn) => TMsgOut): MappedStream<TMsgOut> {
-  return new MapStreamEvents(events, mapper);
-}
-
-export function mapStream<TOuterIn, TOuterOut, TInnerIn, TInnerOut>(inner: Stream<TInnerIn, TInnerOut>, inputMapper: (msg: TOuterIn) => TInnerIn, outputMapper: (msg: TInnerOut) => TOuterOut): Stream<TOuterIn, TOuterOut> {
-  return new MapStream(inner, inputMapper, outputMapper);
 }
 
 export class StatusError extends Error {
@@ -77,9 +89,29 @@ export class StatusError extends Error {
     super(message);
   }
 
+  get status(): Status {
+    const s = new Status();
+    s.setCode(this.code);
+    s.setMessage(this.message);
+    s.setDetailsList(this.details);
+    return s;
+  }
+
+  static fromError(err: Error): StatusError {
+    if (err instanceof StatusError) {
+      return err;
+    }
+
+    return new StatusError(2, err.toString());
+  }
+
+  static fromStatus(status: Status, trailer: Metadata = new Map()): StatusError {
+    return new StatusError(status.getCode(), status.getMessage(), status.getDetailsList(), trailer);
+  }
+
   static fromEvent(evt: StatusEvent): StatusError {
     const { status, trailer } = evt.detail;
-    return new StatusError(status.getCode(), status.getMessage(), status.getDetailsList(), trailer);
+    return StatusError.fromStatus(status, trailer);
   }
 }
 
@@ -108,14 +140,9 @@ export interface CallOptions extends ExtraCallOptions {
 }
 
 export interface Channel {
-  createStream(options: CallOptions): Promise<Stream>;
+  createStream(observer: StreamObserver<Uint8Array>, options: CallOptions): Promise<StreamWriter<Uint8Array>>;
 }
 
 export class ClientBase {
   constructor(private channel: Channel) {}
-}
-
-export interface UnaryResponse<T> {
-  header: Metadata;
-  response: T;
 }
