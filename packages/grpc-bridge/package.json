@@ -1,0 +1,29 @@
+{
+  "name": "@wellplayed/grpc-bridge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "commonjs/index.js",
+  "scripts": {
+    "prepublish": "tsc",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "ava --verbose"
+  },
+  "bin": {
+    "protoc-plugin-grpc-bridge": "./commonjs/bin/protoc-plugin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/google-protobuf": "^3.7.2",
+    "ava": "^2.4.0",
+    "typescript": "^3.7.2"
+  },
+  "dependencies": {
+    "event-target-shim": "^5.0.1",
+    "google-protobuf": "^3.11.0",
+    "ts-protoc-gen": "^0.12.0",
+    "yargs": "^15.0.2"
+  }
+}
