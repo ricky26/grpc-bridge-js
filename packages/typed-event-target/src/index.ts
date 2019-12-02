@@ -20,7 +20,7 @@ interface TypedEventTargetClassTy {
   new<T>(): TypedEventTargetTy<T>;
 }
 
-const EventTarget = ((typeof window !== 'undefined') && window.EventTarget) || require('event-target-shim').EventTarget;
+export const { EventTarget, CustomEvent } = ((typeof window !== 'undefined') && window.EventTarget) ? window : require('event-target-shim');
 
 const BaseClass = EventTarget as TypedEventTargetClassTy;
 export class TypedEventTarget<T> extends BaseClass<T> {};

@@ -131,9 +131,16 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
 
   const imports = new ImportMap(jsName);
   const code = {
-    js: `// Generated from ${basePath}\n\nconst { ClientBase, StatusError, mapStreamEvents, mapStream } = require('${PACKAGE_NAME}');\n\n`,
-    dts: `// Generated from ${basePath}\n\nimport { Service, ServiceMethod, ExtraCallOptions, UnaryResponse } from '${PACKAGE_NAME}';\n\n`,
+    js: `// Generated from ${basePath}\n\n`,
+    dts: `// Generated from ${basePath}\n\n`,
   };
+
+  code.js += `const { ClientBase, StatusError, mapStreamEvents, mapStream } = require('${PACKAGE_NAME}');\n`;
+  code.dts += 'import { TypedEventTarget } from \'@wellplayed/typed-event-target\';\n';
+  code.dts += `import { Service, ServiceMethod, StreamEvents, ClientBase, ExtraCallOptions, UnaryResponse } from '${PACKAGE_NAME}';\n`
+
+  code.js += '\n';
+  code.dts += '\n';
 
   let dtsBody = '';
   let jsBody = '';
@@ -193,7 +200,7 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
     for (const mth of svc.getMethodList()) {
       const mthName = mth.getName() || '';
       const mthJsName = capitalToLowerCamel(mthName);
-      const mthRef = `${svcName}.methods.${mthJsName}`;
+      const mthRef = `exports.${svcName}.methods.${mthJsName}`;
       const inputType = messageToSymbol(imports, mth.getInputType() || '');
       const outputType = messageToSymbol(imports, mth.getOutputType() || '');
       const inputStreaming = mth.getClientStreaming() || false;
@@ -202,18 +209,18 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
       if (inputStreaming) {
         dtsBody += `  ${mthJsName}(options?: ExtraCallOptions): Stream<${inputType}, ${outputType}>;\n`;
 
-        jsBody += `  ${mthJsName}(options) {\n`;
+        jsBody += `  async ${mthJsName}(options) {\n`;
         jsBody += `    const methodDesc = ${mthRef};\n`;
-        jsBody += `    const s = this.channel.createStream({ ...options, method: methodDesc.path });\n`;
+        jsBody += `    const s = await this.channel.createStream({ ...options, method: methodDesc.path });\n`;
         jsBody += `    return mapStream(s, x => x.serializeBinary(), methodDesc.outputType.deserializeBinary());\n`;
         jsBody += `  }\n\n`;
       } else if (outputStreaming) {
         // Only response streaming.
-        dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): StreamEvents<${outputType}>;\n`;
+        dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): TypedEventTarget<StreamEvents<${outputType}>>;\n`;
 
-        jsBody += `  ${mthJsName}(input, options) {\n`;
+        jsBody += `  async ${mthJsName}(input, options) {\n`;
         jsBody += `    const methodDesc = ${mthRef};\n`;
-        jsBody += `    const s = this.channel.createStream({ ...options, method: methodDesc.path });\n`;
+        jsBody += `    const s = await this.channel.createStream({ ...options, method: methodDesc.path });\n`;
         jsBody += `    s.send(input.serializeBinary());\n`;
         jsBody += `    return mapStreamEvents(s, methodDesc.outputType.deserializeBinary());\n`;
         jsBody += `  }\n\n`;
@@ -221,10 +228,10 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
         // Unary call.
         dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): Promise<UnaryResponse<${outputType}>>;\n`;
 
-        jsBody += `  ${mthJsName}(input, options) {\n`;
+        jsBody += `  async ${mthJsName}(input, options) {\n`;
         jsBody += `    const methodDesc = ${mthRef};\n`;
+        jsBody += `    const s = await this.channel.createStream({ ...options, method: methodDesc.path });\n`;
         jsBody += `    return new Promise((accept, reject) => {\n`;
-        jsBody += `      const s = this.channel.createStream({ ...options, method: methodDesc.path });\n`;
         jsBody += `      let header = new Map();\n`;
         jsBody += `      s.addEventListener('header', evt => header = evt.details.header);\n`;
         jsBody += `      s.addEventListener('message', evt => accept({\n`;
@@ -236,8 +243,6 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
         jsBody += `    });\n`;
         jsBody += `  }\n\n`;
       }
-      
-      dtsBody += `  ${mthJsName}()`
     }
 
     jsBody += '}\n';

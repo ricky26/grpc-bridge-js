@@ -1,0 +1,61 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558 
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build",
+      "dependsOn": [
+        "Build typed-event-target",
+        "Build grpc-bridge",
+        "Build grpc-bridge-gen",
+        "Build grpc-bridge-websocket",
+        "Build grpc-bridge-ws",
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Build typed-event-target",
+      "type": "npm",
+      "script": "build",
+      "path": "packages/typed-event-target/",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+    },
+    {
+      "label": "Build grpc-bridge",
+      "type": "npm",
+      "script": "build",
+      "path": "packages/grpc-bridge/",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+    },
+    {
+      "label": "Build grpc-bridge-gen",
+      "type": "npm",
+      "script": "build",
+      "path": "packages/grpc-bridge-gen/",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+    },
+    {
+      "label": "Build grpc-bridge-websocket",
+      "type": "npm",
+      "script": "build",
+      "path": "packages/grpc-bridge-websocket/",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+    },
+    {
+      "label": "Build grpc-bridge-ws",
+      "type": "npm",
+      "script": "build",
+      "path": "packages/grpc-bridge-ws/",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+    },
+  ]
+}

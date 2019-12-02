@@ -1,5 +1,5 @@
 {
-  "name": "@wellplayed/grpc-bridge",
+  "name": "@wellplayed/grpc-bridge-gen",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -9,17 +9,20 @@
     "watch": "tsc -w",
     "test": "ava --verbose"
   },
+  "bin": {
+    "protoc-gen-grpc-bridge": "./wrapper.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@types/google-protobuf": "^3.7.2",
-    "typescript": "^3.7.2",
-    "ts-protoc-gen": "^0.12.0"
+    "@types/node": "^12.12.14",
+    "typescript": "^3.7.2"
   },
   "dependencies": {
-    "@wellplayed/typed-event-target": "file:../typed-event-target",
-    "event-target-shim": "^5.0.1",
-    "google-protobuf": "^3.11.0"
+    "@wellplayed/grpc-bridge": "file:../grpc-bridge",
+    "google-protobuf": "^3.11.0",
+    "yargs": "^15.0.2"
   }
 }

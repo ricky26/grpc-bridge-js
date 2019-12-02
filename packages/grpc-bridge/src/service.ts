@@ -1,7 +1,7 @@
 import { Message } from 'google-protobuf';
 import { ServiceOptions, MethodOptions } from 'google-protobuf/google/protobuf/descriptor_pb';
 import { Any } from 'google-protobuf/google/protobuf/any_pb';
-import { TypedEventTarget } from './events';
+import { TypedEventTarget, CustomEvent } from '@wellplayed/typed-event-target';
 import { Status } from '../proto/bridge_pb';
 
 export type Metadata = Map<string, string[]>;

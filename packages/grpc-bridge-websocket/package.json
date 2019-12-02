@@ -1,5 +1,5 @@
 {
-  "name": "@wellplayed/grpc-bridge",
+  "name": "@wellplayed/grpc-bridge-websocket",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -18,6 +18,7 @@
     "ts-protoc-gen": "^0.12.0"
   },
   "dependencies": {
+    "@wellplayed/grpc-bridge": "file:../grpc-bridge",
     "@wellplayed/typed-event-target": "file:../typed-event-target",
     "event-target-shim": "^5.0.1",
     "google-protobuf": "^3.11.0"

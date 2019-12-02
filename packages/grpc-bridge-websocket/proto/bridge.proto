@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package games.wellplayed.grpcbridge.v1;
+option go_package = "github.com/wellplayedgames/grpc-websocket-bridge/pkg/bridge/api/v1";
+
+import "google/protobuf/any.proto";
+
+message Call {
+	string method = 1 [json_name="m"];
+}
+
+message Metadata {
+    message Item {
+        string key = 1;
+        repeated string value = 2;
+    }
+
+    repeated Item metadata = 1;
+}
+
+message Payload {
+    bytes payload = 1;
+}
+
+message Status {
+    int32 code = 1 [json_name="c"];
+    string message = 2 [json_name="m"];
+    repeated google.protobuf.Any details = 3 [json_name="d"];
+}
+
+message Close {
+}
+
+message Message {
+    int64 stream_id = 1 [json_name="$"];
+
+    oneof message {
+        Call call = 2 [json_name="c"];
+        Metadata metadata = 3 [json_name="m"];
+        Payload payload = 4 [json_name="p"];
+        Status status = 5 [json_name="s"];
+        Close close = 6 [json_name="x"];
+    }
+}

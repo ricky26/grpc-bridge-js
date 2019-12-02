@@ -1,6 +1,6 @@
-import { Status, Message, Metadata as MetadataPb, Call, Payload, Close } from '../proto/bridge_pb';
-import { StreamEvents, Stream, Channel, CallOptions, Metadata } from './service';
-import { TypedEventTarget } from './events';
+import { Status, Message, Metadata as MetadataPb, Call, Payload, Close } from '@wellplayed/grpc-bridge/proto/bridge_pb';
+import { StreamEvents, Stream, Channel, CallOptions, Metadata } from '@wellplayed/grpc-bridge';
+import { TypedEventTarget, CustomEvent } from '@wellplayed/typed-event-target';
 import { WebSocketPool } from './pool';
 
 const STATUS_ABRUPT = new Status();

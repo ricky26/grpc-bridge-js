@@ -1,5 +1,5 @@
 {
-  "name": "@wellplayed/grpc-bridge",
+  "name": "@wellplayed/typed-event-target",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -13,13 +13,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/google-protobuf": "^3.7.2",
-    "typescript": "^3.7.2",
-    "ts-protoc-gen": "^0.12.0"
+    "typescript": "^3.7.2"
   },
   "dependencies": {
-    "@wellplayed/typed-event-target": "file:../typed-event-target",
-    "event-target-shim": "^5.0.1",
-    "google-protobuf": "^3.11.0"
+    "@types/node": "^12.12.14",
+    "event-target-shim": "^5.0.1"
   }
 }
