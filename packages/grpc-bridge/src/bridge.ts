@@ -20,7 +20,6 @@ STATUS_ABRUPT.setMessage('Call aborted.');
 class BridgeStream implements StreamWriter<Uint8Array> {
   private status: Status;
   private trailer: Metadata;
-  private open: boolean;
 
   constructor(
     private transportWriter: TransportWriter,
@@ -28,7 +27,6 @@ class BridgeStream implements StreamWriter<Uint8Array> {
     private observer: StreamObserver<Uint8Array>,
     call: Call, metadata?: Metadata)
   {
-    this.open = true;
     this.status = STATUS_ABRUPT;
     this.trailer = new Map();
 
@@ -53,10 +51,6 @@ class BridgeStream implements StreamWriter<Uint8Array> {
   }
 
   onClose(err: Error) {
-    if (!this.open) {
-      return;
-    }
-
     const { status, trailer } = StatusError.fromError(err);
     this.status = status;
     this.trailer = trailer;
@@ -64,11 +58,6 @@ class BridgeStream implements StreamWriter<Uint8Array> {
   }
 
   doClose() {
-    if (!this.open) {
-      return;
-    }
-
-    this.open = false;
     this.observer.onEnd(this.status, this.trailer);
   }
 
@@ -110,10 +99,6 @@ class BridgeStream implements StreamWriter<Uint8Array> {
   }
 
   send(msg: Uint8Array): void {
-    if (!this.open) {
-      throw new Error('send on closed stream');
-    }
-
     const p = new Payload();
     p.setPayload(msg);
 
@@ -124,16 +109,11 @@ class BridgeStream implements StreamWriter<Uint8Array> {
   }
 
   close(): void {
-    if (!this.open) {
-      throw new Error('close on closed stream');
-    }
-
     const x = new Close();
     const m = new Message()
     m.setStreamId(this.streamId);
     m.setClose(x);
     this.transportWriter.send(m.serializeBinary());
-    this.open = false;
   }
 }
 

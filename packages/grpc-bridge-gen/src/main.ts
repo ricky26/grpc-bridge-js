@@ -135,7 +135,7 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
     dts: `// Generated from ${basePath}\n\n`,
   };
 
-  code.js += `const { ClientBase, StatusError, mapStreamWriter, mapStreamObserver } = require('${PACKAGE_NAME}');\n`;
+  code.js += `const { ClientBase, StatusError, AsyncStreamObserver, mapStreamWriter, mapStreamObserver } = require('${PACKAGE_NAME}');\n`;
   code.dts += `import { Service, ServiceMethod, StreamWriter, StreamObserver, ClientBase, ExtraCallOptions, UnaryResponse } from '${PACKAGE_NAME}';\n`
 
   code.js += '\n';

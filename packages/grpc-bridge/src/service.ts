@@ -50,6 +50,11 @@ export function mapStreamWriter<TInner, TOuter>(writer: StreamWriter<TInner>, ma
   };
 }
 
+export function streamObserverThrow<T>(observer: StreamObserver<T>, err: Error): void {
+  const { status, trailer } = StatusError.fromError(err);
+  observer.onEnd(status, trailer);
+}
+
 export class AsyncStreamObserver<TMsg> implements StreamObserver<TMsg> {
   public header: Metadata;
   public message: TMsg | null;
@@ -146,3 +151,7 @@ export interface Channel {
 export class ClientBase {
   constructor(private channel: Channel) {}
 }
+
+export {
+  Status,
+};
