@@ -120,12 +120,17 @@ export class StatusError extends Error {
   }
 }
 
-export interface ServiceMethod {
+export interface MessageType<T extends Message = Message> {
+  new(): T;
+  deserializeBinary(data: Uint8Array): T;
+}
+
+export interface ServiceMethod<TIn extends Message = Message, TOut extends Message = Message> {
   name: string;
   path: string;
   options: MethodOptions.AsObject,
-  inputType: Message;
-  outputType: Message;
+  inputType: MessageType<TIn>;
+  outputType: MessageType<TOut>;
   serverStreaming: boolean;
   clientStreaming: boolean;
 }
@@ -155,3 +160,41 @@ export class ClientBase {
 export {
   Status,
 };
+
+export function invoke<TIn extends Message, TOut extends Message>(
+  channel: Channel,
+  method: ServiceMethod<TIn, TOut>,
+  observer: StreamObserver<TOut>,
+  options: ExtraCallOptions = {}): Promise<StreamWriter<TIn>> {
+
+  const rawObserver = mapStreamObserver<Uint8Array, TOut>(observer, x => method.outputType.deserializeBinary(x));
+  return channel.createStream(rawObserver, { ...options, method: method.path })
+    .then(writer => mapStreamWriter(writer, x => x.serializeBinary()));
+}
+
+export function invokeClientStreaming<TIn extends Message, TOut extends Message>(
+  channel: Channel,
+  method: ServiceMethod<TIn, TOut>,
+  input: TIn,
+  observer: StreamObserver<TOut>,
+  options: ExtraCallOptions = {}): void {
+
+  invoke(channel, method, observer, options)
+    .then(writer => {
+      writer.send(input);
+      writer.close();
+    })
+    .catch(err => streamObserverThrow(observer, err));
+}
+
+export function invokeUnary<TIn extends Message, TOut extends Message>(
+  channel: Channel,
+  method: ServiceMethod<TIn, TOut>,
+  input: TIn,
+  options: ExtraCallOptions = {}): Promise<UnaryResponse<TOut>> {
+
+  return new Promise((accept, reject) => {
+    const observer = new AsyncStreamObserver(accept, reject);
+    invokeClientStreaming(channel, method, input, observer, options);
+  });
+}
