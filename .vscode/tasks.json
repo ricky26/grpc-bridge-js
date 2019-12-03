@@ -6,7 +6,6 @@
     {
       "label": "Build",
       "dependsOn": [
-        "Build typed-event-target",
         "Build grpc-bridge",
         "Build grpc-bridge-gen",
         "Build grpc-bridge-websocket",
@@ -16,14 +15,6 @@
         "kind": "build",
         "isDefault": true
       }
-    },
-    {
-      "label": "Build typed-event-target",
-      "type": "npm",
-      "script": "build",
-      "path": "packages/typed-event-target/",
-      "group": "build",
-      "problemMatcher": ["$tsc"],
     },
     {
       "label": "Build grpc-bridge",

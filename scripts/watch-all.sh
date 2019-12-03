@@ -3,15 +3,15 @@
 set -e
 
 PACKAGES="\
-  typed-event-target\
-  grpc-bridge\
-  grpc-bridge-gen\
-  grpc-bridge-websocket\
-  grpc-bridge-ws\
+  packages/grpc-bridge\
+  packages/grpc-bridge-gen\
+  packages/grpc-bridge-websocket\
+  packages/grpc-bridge-ws\
+  examples/routeguide\
   "
 
 for PACKAGE in $PACKAGES; do
-  pushd "packages/$PACKAGE"
+  pushd "$PACKAGE"
   npm run watch &
   popd
 done

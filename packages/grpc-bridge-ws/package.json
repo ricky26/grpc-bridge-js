@@ -1,5 +1,9 @@
 {
   "name": "@wellplayed/grpc-bridge-ws",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wellplayedgames/grpc-bridge-js"
+  },
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -20,7 +24,6 @@
   },
   "dependencies": {
     "@wellplayed/grpc-bridge": "file:../grpc-bridge",
-    "@wellplayed/typed-event-target": "file:../typed-event-target",
     "event-target-shim": "^5.0.1",
     "google-protobuf": "^3.11.0",
     "ws": "^7.2.0"

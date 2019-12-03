@@ -1,0 +1,32 @@
+{
+  "name": "@wellplayedgames/grpc-bridge-example",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wellplayedgames/grpc-bridge-js"
+  },
+  "version": "1.0.0",
+  "description": "An example project which tests the grpc-bridge.",
+  "main": "dist/index.js",
+  "scripts": {
+    "protoc": "protoc --js_out=import_style=commonjs:. --ts_out=. --grpc-bridge_out=. proto/routeguide.proto",
+    "prepublish": "npm run protoc && tsc",
+    "watch": "tsc -w",
+    "start": "tsc && node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Well Played Games Ltd.",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/google-protobuf": "^3.7.2",
+    "@types/node": "^12.12.14",
+    "@types/yargs": "^13.0.3",
+    "@wellplayed/grpc-bridge-gen": "file:../../packages/grpc-bridge-gen",
+    "typescript": "^3.7.2"
+  },
+  "dependencies": {
+    "@wellplayed/grpc-bridge": "file:../../packages/grpc-bridge",
+    "@wellplayed/grpc-bridge-ws": "file:../../packages/grpc-bridge-ws",
+    "google-protobuf": "^3.11.1",
+    "yargs": "^15.0.2"
+  }
+}

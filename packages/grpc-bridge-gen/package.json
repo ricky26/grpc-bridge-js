@@ -1,5 +1,9 @@
 {
   "name": "@wellplayed/grpc-bridge-gen",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wellplayedgames/grpc-bridge-js"
+  },
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
