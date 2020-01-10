@@ -1,5 +1,5 @@
 // package: games.wellplayed.grpcbridge.v1
-// file: bridge.proto
+// file: proto/bridge.proto
 
 import * as jspb from "google-protobuf";
 import * as google_protobuf_any_pb from "google-protobuf/google/protobuf/any_pb";
@@ -72,6 +72,26 @@ export namespace Metadata {
   }
 }
 
+export class Ready extends jspb.Message {
+  getCount(): number;
+  setCount(value: number): void;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): Ready.AsObject;
+  static toObject(includeInstance: boolean, msg: Ready): Ready.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: Ready, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): Ready;
+  static deserializeBinaryFromReader(message: Ready, reader: jspb.BinaryReader): Ready;
+}
+
+export namespace Ready {
+  export type AsObject = {
+    count: number,
+  }
+}
+
 export class Payload extends jspb.Message {
   getPayload(): Uint8Array | string;
   getPayload_asU8(): Uint8Array;
@@ -91,6 +111,22 @@ export class Payload extends jspb.Message {
 export namespace Payload {
   export type AsObject = {
     payload: Uint8Array | string,
+  }
+}
+
+export class End extends jspb.Message {
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): End.AsObject;
+  static toObject(includeInstance: boolean, msg: End): End.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: End, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): End;
+  static deserializeBinaryFromReader(message: End, reader: jspb.BinaryReader): End;
+}
+
+export namespace End {
+  export type AsObject = {
   }
 }
 
@@ -154,10 +190,20 @@ export class Message extends jspb.Message {
   getMetadata(): Metadata | undefined;
   setMetadata(value?: Metadata): void;
 
+  hasReady(): boolean;
+  clearReady(): void;
+  getReady(): Ready | undefined;
+  setReady(value?: Ready): void;
+
   hasPayload(): boolean;
   clearPayload(): void;
   getPayload(): Payload | undefined;
   setPayload(value?: Payload): void;
+
+  hasEnd(): boolean;
+  clearEnd(): void;
+  getEnd(): End | undefined;
+  setEnd(value?: End): void;
 
   hasStatus(): boolean;
   clearStatus(): void;
@@ -185,7 +231,9 @@ export namespace Message {
     streamId: number,
     call?: Call.AsObject,
     metadata?: Metadata.AsObject,
+    ready?: Ready.AsObject,
     payload?: Payload.AsObject,
+    end?: End.AsObject,
     status?: Status.AsObject,
     close?: Close.AsObject,
   }
@@ -194,9 +242,11 @@ export namespace Message {
     MESSAGE_NOT_SET = 0,
     CALL = 2,
     METADATA = 3,
-    PAYLOAD = 4,
-    STATUS = 5,
-    CLOSE = 6,
+    READY = 4,
+    PAYLOAD = 5,
+    END = 6,
+    STATUS = 7,
+    CLOSE = 8,
   }
 }
 

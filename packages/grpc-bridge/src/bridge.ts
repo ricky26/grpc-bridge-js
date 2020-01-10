@@ -1,5 +1,5 @@
-import { Status, Message, Metadata as MetadataPb, Call, Payload, Close } from '../proto/bridge_pb';
-import { Metadata, StreamWriter, StreamObserver, StatusError, Channel, CallOptions } from './service';
+import { Status, Message, Metadata as MetadataPb, Call, Payload, Close, End, Ready } from '../proto/bridge_pb';
+import { Metadata, StreamWriter, StreamObserver, StatusError, Channel, CallOptions, AsyncStreamWriter, ExtraCallOptions } from './service';
 import { SocketPool, SocketLifetime } from './pool';
 
 export interface TransportObserver {
@@ -13,6 +13,75 @@ export interface TransportWriter {
   close(): void;
 }
 
+type SemaCallback = (e?: Error) => void;
+class Sema {
+  private count: number;
+  private onChange: SemaCallback[];
+  private cancelError?: Error;
+
+  constructor() {
+    this.count = 0;
+    this.onChange = [];
+  }
+
+  addWatch(cb: SemaCallback): void {
+    if (this.cancelError) {
+      return cb(this.cancelError);
+    }
+
+    const idx = this.onChange.indexOf(cb);
+    if (idx < 0) {
+      this.onChange.push(cb);
+    }
+  }
+
+  removeWatch(cb: SemaCallback): void {
+    const idx = this.onChange.indexOf(cb);
+    if (idx >= 0) {
+      this.onChange.splice(idx, 1);
+    }
+  }
+
+  cancel() {
+    this.cancelError = new Error('cancelling sema');
+    this.onChange.splice(0, this.onChange.length).forEach(v => v(this.cancelError));
+  }
+
+  mod(delta: number) {
+    this.count += delta;
+    this.onChange.slice().forEach(v => v());
+  }
+
+  inc(amt: number = 1) {
+    return this.mod(amt); 
+  }
+
+  dec(amt: number = 1): Promise<void> {
+    return new Promise((accept, reject) => {
+      if (this.count > 0) {
+        this.count -= amt;
+        return accept();
+      }
+
+      const handle = (err?: Error) => {
+        if (err) {
+          cleanup();
+          return reject(err);
+        }
+
+        if (this.count > 0) {
+          this.count -= amt;
+          cleanup();
+          return accept();
+        }
+      }
+
+      const cleanup = () => this.removeWatch(handle);
+      this.onChange.push(handle);
+    });
+  }
+}
+
 const STATUS_ABRUPT = new Status();
 STATUS_ABRUPT.setCode(2);
 STATUS_ABRUPT.setMessage('Call aborted.');
@@ -20,25 +89,30 @@ STATUS_ABRUPT.setMessage('Call aborted.');
 class BridgeStream implements StreamWriter<Uint8Array> {
   private status: Status;
   private trailer: Metadata;
+  private open: boolean;
+  private ready: Sema;
 
   constructor(
+    private unlink: () => void,
     private transportWriter: TransportWriter,
     private streamId: number,
     private observer: StreamObserver<Uint8Array>,
-    call: Call, metadata?: Metadata)
+    call: Call, options?: ExtraCallOptions)
   {
+    this.open = true;
     this.status = STATUS_ABRUPT;
     this.trailer = new Map();
+    this.ready = new Sema();
 
     const m = new Message();
     m.setStreamId(streamId);
     m.setCall(call);
     transportWriter.send(m.serializeBinary());
 
-    if (metadata !== undefined) {
+    if (options && options.metadata) {
       const md = new MetadataPb();
 
-      for (const [k, v] of metadata.entries()) {
+      for (const [k, v] of options.metadata.entries()) {
         const item = new MetadataPb.Item();
         item.setKey(k);
         item.setValueList(v);
@@ -48,23 +122,34 @@ class BridgeStream implements StreamWriter<Uint8Array> {
       m.setMetadata(md);
       transportWriter.send(m.serializeBinary());
     }
+
+    const initialWindowSize = (options && options.initialWindowSize) || (64 * 1024);
+
+    const r = new Ready()
+    r.setCount(initialWindowSize);
+    m.setReady(r);
+    transportWriter.send(m.serializeBinary());
   }
 
   onClose(err: Error) {
     const { status, trailer } = StatusError.fromError(err);
     this.status = status;
     this.trailer = trailer;
-    this.doClose();
+    this.cancel();
+    this.sendStatus();
   }
 
-  doClose() {
-    this.observer.onEnd(this.status, this.trailer);
+  sendStatus() {
+    const err = StatusError.fromStatus(this.status, this.trailer);
+    this.observer.onEnd(err.ok ? undefined : err, err.trailer);
+    this.unlink();
+    this.ready.cancel();
   }
 
   onMessage(msg: Message): void {
     switch (msg.getMessageCase()) {
-      case Message.MessageCase.CLOSE:
-        this.doClose();
+      case Message.MessageCase.END:
+        this.sendStatus();
         break;
       
       case Message.MessageCase.METADATA:
@@ -75,7 +160,7 @@ class BridgeStream implements StreamWriter<Uint8Array> {
           md.set(item.getKey(), item.getValueList());
         }
 
-        if (this.status === null) {
+        if (this.status === STATUS_ABRUPT) {
           this.observer.onHeader(md);
         } else {
           this.trailer = md;
@@ -83,10 +168,24 @@ class BridgeStream implements StreamWriter<Uint8Array> {
 
         break;
 
+      case Message.MessageCase.READY:
+        this.ready.inc(msg.getReady()!.getCount());
+        break;
+
       case Message.MessageCase.PAYLOAD:
         const payload = msg.getPayload()!;
         const p = payload.getPayload() as Uint8Array;
-        this.observer.onMessage(p);
+
+        Promise.resolve(this.observer.onMessage(p))
+          .catch(err => this.onClose(err))
+          .then(() => {
+            const m = new Message();
+            const r = new Ready()
+            r.setCount(p.length);
+            m.setStreamId(this.streamId);
+            m.setReady(r);
+            this.transportWriter.send(m.serializeBinary());
+          });
         break;
 
       case Message.MessageCase.STATUS:
@@ -98,7 +197,13 @@ class BridgeStream implements StreamWriter<Uint8Array> {
     }
   }
 
-  send(msg: Uint8Array): void {
+  async send(msg: Uint8Array): Promise<void> {    
+    await this.ready.dec(msg.length);
+
+    if (!this.open) {
+      return;
+    }
+
     const p = new Payload();
     p.setPayload(msg);
 
@@ -108,11 +213,28 @@ class BridgeStream implements StreamWriter<Uint8Array> {
     this.transportWriter.send(m.serializeBinary());
   }
 
-  close(): void {
-    const x = new Close();
+  end(): void {
+    this.ready.cancel();
+
+    const e = new End();
     const m = new Message()
     m.setStreamId(this.streamId);
-    m.setClose(x);
+    m.setEnd(e);
+    this.transportWriter.send(m.serializeBinary());
+  }
+
+  cancel(): void {
+    if (!this.open) {
+      return;
+    }
+
+    this.open = false;
+    this.ready.cancel();
+
+    const c = new Close();
+    const m = new Message()
+    m.setStreamId(this.streamId);
+    m.setClose(c);
     this.transportWriter.send(m.serializeBinary());
   }
 }
@@ -143,10 +265,6 @@ class BridgeTransport implements TransportObserver {
     }
 
     stream.onMessage(msg);
-
-    if (msg.getMessageCase() === Message.MessageCase.CLOSE) {
-      this.streams.delete(streamId);
-    }
   }
 
   onClose(err: Error): void {
@@ -160,12 +278,17 @@ class BridgeTransport implements TransportObserver {
     }
   }
 
+  destroy(): void {
+    return this.onClose(new Error('shutting down'));
+  }
+
   async createStream(observer: StreamObserver<Uint8Array>, options: CallOptions): Promise<StreamWriter<Uint8Array>> {
     const c = new Call();
     c.setMethod(options.method);
 
     const streamId = this.nextStream++;
-    const stream = new BridgeStream(this.writer, streamId, observer, c, options.metadata);
+    const unlink = () => this.streams.delete(streamId);
+    const stream = new BridgeStream(unlink, this.writer, streamId, observer, c, options);
     this.streams.set(streamId, stream);
     return stream;
   }
@@ -178,8 +301,26 @@ export class BridgeChannel implements Channel {
     this.pool = new SocketPool(lifecycle => new BridgeTransport(lifecycle, factory));
   }
 
-  async createStream(observer: StreamObserver<Uint8Array>, options: CallOptions): Promise<StreamWriter<Uint8Array>> {
-    const transport = await this.pool.get();
-    return transport.createStream(observer, options);
+  destroy(): void {
+    const transports = this.pool.destroy();
+    for (const transport of transports) {
+      transport.destroy();
+    }
+  }
+
+  createStream(observer: StreamObserver<Uint8Array>, options: CallOptions): StreamWriter<Uint8Array> {
+    const asyncWriter = new AsyncStreamWriter<Uint8Array>();
+
+    (async() => {
+      try {
+        const transport = await this.pool.get();
+        const stream = await transport.createStream(observer, options);
+        await asyncWriter.onReady(stream);
+      } catch (err) {
+        observer.onEnd(err);
+      }
+    })();
+
+    return asyncWriter;
   }
 }

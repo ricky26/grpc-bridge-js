@@ -10,6 +10,7 @@
   "scripts": {
     "protoc": "protoc --js_out=import_style=commonjs:. --ts_out=. --grpc-bridge_out=. proto/routeguide.proto",
     "prepublish": "npm run protoc && tsc",
+    "build": "tsc",
     "watch": "tsc -w",
     "start": "tsc && node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -4,10 +4,11 @@
     "type": "git",
     "url": "https://github.com/wellplayedgames/grpc-bridge-js"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
+    "protoc": "protoc --js_out=import_style=commonjs:. --ts_out=. proto/bridge.proto",
     "prepare": "tsc",
     "build": "tsc",
     "watch": "tsc -w",
