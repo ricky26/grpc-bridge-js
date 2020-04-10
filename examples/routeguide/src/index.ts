@@ -37,31 +37,28 @@ async function asyncMain() {
 
   const client = new services.RouteGuideClient(channel);
 
-  const feature = await client.getFeature(mkPoint(0, 0));
+  const feature = await client.getFeature(mkPoint(0, 0)).response;
   console.log('get', feature.message.toObject());
 
-  const features = await new Promise<messages.Feature[]>(accept => {
+  const features = await new Promise<messages.Feature[]>((accept, reject) => {
     const features: messages.Feature[] = [];
     client.listFeatures(RECT_ALL, {
       onHeader() {},
       onMessage(feature) {
         features.push(feature);
       },
-      onEnd() { accept(features) },
+      onEnd(err) { err ? accept(features) : reject(err) },
     });
   });
   console.log('list', features.map(x => x.toObject()));
 
   const summary = await new Promise<UnaryResponse<messages.RouteSummary>>((accept, reject) => {
-    client.recordRoute(new AsyncStreamObserver<messages.RouteSummary>(accept, reject))
-      .then(writer => {
-        writer.send(PT_MIN);
-        writer.send(PT_MAX);
-        writer.send(PT_MIN);
-        writer.send(PT_MAX);
-        writer.close();
-      })
-      .catch(reject);
+    const writer = client.recordRoute(new AsyncStreamObserver<messages.RouteSummary>(accept, reject));
+    writer.send(PT_MIN);
+    writer.send(PT_MAX);
+    writer.send(PT_MIN);
+    writer.send(PT_MAX);
+    writer.end();
   });
   console.log('summary', summary.message.toObject());
 }

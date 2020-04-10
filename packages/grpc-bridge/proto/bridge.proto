@@ -18,9 +18,15 @@ message Metadata {
     repeated Item metadata = 1;
 }
 
+message Ready {
+    int32 count = 1;
+}
+
 message Payload {
     bytes payload = 1;
 }
+
+message End {}
 
 message Status {
     int32 code = 1 [json_name="c"];
@@ -28,8 +34,7 @@ message Status {
     repeated google.protobuf.Any details = 3 [json_name="d"];
 }
 
-message Close {
-}
+message Close {}
 
 message Message {
     int64 stream_id = 1 [json_name="$"];
@@ -37,8 +42,10 @@ message Message {
     oneof message {
         Call call = 2 [json_name="c"];
         Metadata metadata = 3 [json_name="m"];
-        Payload payload = 4 [json_name="p"];
-        Status status = 5 [json_name="s"];
-        Close close = 6 [json_name="x"];
+        Ready ready = 4 [json_name="r"];
+        Payload payload = 5 [json_name="p"];
+        End end = 6 [json_name="e"];
+        Status status = 7 [json_name="s"];
+        Close close = 8 [json_name="x"];
     }
 }

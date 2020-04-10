@@ -8,6 +8,10 @@
     "noImplicitAny": true,
     "noImplicitThis": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "lib": [
+      "ES2017",
+      "DOM"
+    ]
   }
 }

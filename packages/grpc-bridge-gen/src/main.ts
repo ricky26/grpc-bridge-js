@@ -135,8 +135,8 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
     dts: `// Generated from ${basePath}\n\n`,
   };
 
-  code.js += `const { ClientBase, invoke, invokeClientStreaming, invokeUnary } = require('${PACKAGE_NAME}');\n`;
-  code.dts += `import { Service, StreamWriter, StreamObserver, ClientBase, ExtraCallOptions, UnaryResponse } from '${PACKAGE_NAME}';\n`
+  code.js += `const { ClientBase, invoke, invokeServerStreaming, invokeUnary } = require('${PACKAGE_NAME}');\n`;
+  code.dts += `import { Service, StreamWriter, StreamObserver, Cancelable, ClientBase, ExtraCallOptions, UnaryCall } from '${PACKAGE_NAME}';\n`
 
   code.js += '\n';
   code.dts += '\n';
@@ -206,21 +206,21 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
       const outputStreaming = mth.getServerStreaming() || false;
 
       if (inputStreaming) {
-        dtsBody += `  ${mthJsName}(observer: StreamObserver<${outputType}>, options?: ExtraCallOptions): Promise<StreamWriter<${inputType}>>;\n`;
+        dtsBody += `  ${mthJsName}(observer: StreamObserver<${outputType}>, options?: ExtraCallOptions): StreamWriter<${inputType}>;\n`;
 
         jsBody += `  ${mthJsName}(observer, options) {\n`;
         jsBody += `    return invoke(this.channel, ${mthRef}, observer, options);\n`
         jsBody += `  }\n\n`;
       } else if (outputStreaming) {
         // Only response streaming.
-        dtsBody += `  ${mthJsName}(input: ${inputType}, observer: StreamObserver<${outputType}>, options?: ExtraCallOptions): void;\n`;
+        dtsBody += `  ${mthJsName}(input: ${inputType}, observer: StreamObserver<${outputType}>, options?: ExtraCallOptions): Cancelable;\n`;
 
         jsBody += `  ${mthJsName}(input, observer, options) {\n`;
-        jsBody += `    return invokeClientStreaming(this.channel, ${mthRef}, input, observer, options);\n`
+        jsBody += `    return invokeServerStreaming(this.channel, ${mthRef}, input, observer, options);\n`
         jsBody += `  }\n\n`;
       } else {
         // Unary call.
-        dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): Promise<UnaryResponse<${outputType}>>;\n`;
+        dtsBody += `  ${mthJsName}(input: ${inputType}, options?: ExtraCallOptions): UnaryCall<${outputType}>;\n`;
 
         jsBody += `  ${mthJsName}(input, options) {\n`;
         jsBody += `    return invokeUnary(this.channel, ${mthRef}, input, options);\n`
@@ -265,6 +265,10 @@ function generateCode(basePath: string, desc: FileDescriptorProto): GeneratedCod
     if (!desc) {
       console.error('No descriptor for', fileToGenerate);
       process.exit(1);
+    }
+
+    if (desc.getServiceList().length == 0) {
+      continue;
     }
 
     const basePath = (desc.getName() || '').replace('.proto', '');

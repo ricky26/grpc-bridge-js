@@ -29,6 +29,23 @@ export class SocketPool<TSocket> implements SocketLifetime<TSocket> {
     this.removeSocket = this.removeSocket.bind(this);
   }
 
+  destroy(): TSocket[] {
+    const socketsToClose = [...this.activeSockets, ...this.pendingSockets];
+    const pendingRequests = [...this.pendingRequests];
+
+    this.activeSockets = [];
+    this.pendingSockets = [];
+    this.pendingRequests = [];
+
+    const err = new Error('shutting down');
+
+    for (const req of pendingRequests) {
+      req.reject(err);
+    }
+
+    return socketsToClose;
+  }
+
   private removePendingSocket(s: TSocket): void {
     const idx = this.pendingSockets.indexOf(s);
     if (idx >= 0) {
